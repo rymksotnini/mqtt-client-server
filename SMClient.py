@@ -10,15 +10,26 @@ class SMClient (mqtt.Client):
         self.client = mqtt.Client()
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
-    
-    def connect(self):
-        self.client.connect("localhost", 1883)
 
-    def connect_and_loop(self):
-        self.connect()
-        self.publish_consommation()
-        self.publish_production()
-        self.client.loop_forever()
+    @staticmethod
+    def on_connect(client, userdata, flags, rc):
+        if rc == 0:
+            print("Connection to MQTT Broker was a success!")
+        else:
+            print("Connection failure with return code %d\n", rc)
+        client.subscribe("reduction/#")
+        client.subscribe("prix/#")
+
+    @staticmethod
+    def on_message(client, userdata, msg):
+        now = datetime.now()
+        current_time = now.strftime("%H:%M:%S")
+        payload = msg.payload.decode('utf-8')[1:-1]
+        id_part,value_part=payload.split(",")
+        id_n=id_part.split(":")[1]
+        value=value_part.split(":")[1]
+        print(f"[{current_time}] Received payload from{id_n} => {msg.topic}: {value}")
+    
 
     def publish_consommation(self,consommation=4):
         time.sleep(1)
@@ -42,21 +53,12 @@ class SMClient (mqtt.Client):
             print(f"Failed to send message to topic production")
         threading.Timer(60.0*15.0, self.publish_production).start()
 
-    @staticmethod
-    def on_connect(client, userdata, flags, rc):
-        if rc == 0:
-            print("Connected to MQTT Broker!")
-        else:
-            print("Failed to connect, return code %d\n", rc)
-        client.subscribe("reduction/#")
-        client.subscribe("prix/#")
+    def main(self):
+        self.client.connect("localhost",1883)
+        self.publish_consommation()
+        self.publish_production()
+        self.client.loop_forever()
 
-    @staticmethod
-    def on_message(client, userdata, msg):
-        now = datetime.now()
-        current_time = now.strftime("%H:%M:%S")
-        payload = msg.payload.decode('utf-8')[1:-1]
-        id_part,value_part=payload.split(",")
-        id_n=id_part.split(":")[1]
-        value=value_part.split(":")[1]
-        print(f"[{current_time}] Received payload from{id_n} => {msg.topic}: {value}")
+if __name__=="__main__":
+    smclient = SMClient()
+    smclient.main()
